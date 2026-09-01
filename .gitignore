@@ -1,2 +1,5 @@
 # PAT TOKEN
 .env
+
+#Buffer files
+*~
