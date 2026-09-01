@@ -1,4 +1,4 @@
-#include "../include/gaussian.hpp"
+#include "include/gaussian.hpp"
 
 void print_matrix(std::vector<std::vector<double>> mat){
   for(std::vector<double> arr:mat){
