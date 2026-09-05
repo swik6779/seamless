@@ -1,5 +1,8 @@
 # PAT TOKEN
 .env
 
-#Buffer files
+# Buffer files
 *~
+
+# Output files
+seamless
