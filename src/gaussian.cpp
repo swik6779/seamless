@@ -90,7 +90,8 @@ std::vector<std::vector<float>> create_gaussian_kernel(int k)
     this kernel is applied onto each pixel. each pixel is manipulated using k^2 arithmetic operations
 */
 
-void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<float>> &kernel){
+void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<float>> &kernel)
+{
   int height, width, channel;
   stbi_uc *decoded_vals = stbi_load(filepath, &width, &height, &channel, STBI_rgb);
 
@@ -116,14 +117,14 @@ void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<
           int ny = y + ky;
 
           // Edge replication
-          if (nx < 0)
+          if(nx < 0)
             nx = 0;
-          else if (nx >= width)
+          else if(nx >= width)
             nx = width - 1;
 
-          if (ny < 0)
+          if(ny < 0)
             ny = 0;
-          else if (ny >= height)
+          else if(ny >= height)
             ny = height - 1;
 
           int idx = (ny * width + nx) * 3;
@@ -149,9 +150,14 @@ void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<
     fprintf(stderr, "could not write smoothened values into PNG\n");
     return;
   }
+
+  stbi_image_free(decoded_vals);
+  free(smoothened_vals);
 }
 
-void gaussian_blur_iterable_seperable(const char *filepath, std::vector<float> &weights){
+void gaussian_blur_iterable_seperable(const char *filepath, std::vector<float> &weights)
+{
+  
   int height, width, channel;
   stbi_uc *decoded_vals = stbi_load(filepath, &width, &height, &channel, STBI_rgb);
 
@@ -161,24 +167,83 @@ void gaussian_blur_iterable_seperable(const char *filepath, std::vector<float> &
   }
 
   int radius = weights.size()/2;
+  size_t image_size = width * height * channel;
+
+  std::vector<float> horizontal(image_size);
   stbi_uc *smoothened_vals = (stbi_uc *)malloc(height * width * 3 * sizeof(stbi_uc));
 
-  for(int y=0; y<height; y++){
-    for(int x=0; x<width; x++){
+  for(int y = 0; y < height; y++){
+    for(int x = 0; x < width; x++){
+      float r = 0.0;
+      float g = 0.0;
+      float b = 0.0;
+
+      for(int kx = -radius; kx <= radius; kx++){
+        int nx = x + kx;
+            
+        if(nx < 0)
+          nx = 0;
+        else if(nx >= width)
+          nx = width - 1;
+
+        int input_idx = (y * width + nx) * 3;
+
+        float weight = weights[kx + radius];
+
+        r += weight * decoded_vals[input_idx];
+        g += weight * decoded_vals[input_idx + 1];
+        b += weight * decoded_vals[input_idx + 2];
+      }
+
+      int output_idx = (y * width + x) * 3;
+
+      horizontal[output_idx]     = r;
+      horizontal[output_idx + 1] = g;
+      horizontal[output_idx + 2] = b;
+    }
+  }
+
+  for(int y = 0; y < height; y++){
+    for(int x = 0; x < width; x++){
 
       float r = 0.0;
       float g = 0.0;
       float b = 0.0;
-      for(kx = -radius; kx<=radius; kx++){
-        int nx = kx + x;
+      for(int ky = -radius; ky <= radius; ky++){
+        int ny = y + ky;
         
+        if(ny < 0)
+          ny = 0;
+        else if(ny >= height)
+          ny = height - 1;
+
+        int input_idx = (ny * width + x) * 3;
+
+        float weight = weights[ky + radius];
+
+        r += weight * horizontal[input_idx];
+        g += weight * horizontal[input_idx + 1];
+        b += weight * horizontal[input_idx + 2];
       }
+
+      int output_idx = (y * width + x) * 3;
+
+      r = (r > 255.0)? 255.0:r;
+      g = (g > 255.0)? 255.0:g;
+      b = (b > 255.0)? 255.0:b;
+
+      smoothened_vals[output_idx]     = (stbi_uc)r;
+      smoothened_vals[output_idx + 1] = (stbi_uc)g;
+      smoothened_vals[output_idx + 2] = (stbi_uc)b;
     }
   }
-  
+
   
   if(!stbi_write_png("smoothened.png", width, height, STBI_rgb, smoothened_vals, width*3)){
     fprintf(stderr, "could not write smoothened values into PNG\n");
     return;
   }
+
+  stbi_image_free(decoded_vals);
+  free(smoothened_vals);
 }
