@@ -4,5 +4,16 @@
 # Buffer files
 *~
 
-# Output files
+# Output binaries
 seamless
+seamless_omp
+
+# Input images
+*.jpg
+*.jpeg
+
+# Output images
+*.png
+*.bmp
+*.tga
+*.hdr
