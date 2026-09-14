@@ -90,7 +90,7 @@ std::vector<std::vector<float>> create_gaussian_kernel(int k)
     this kernel is applied onto each pixel. each pixel is manipulated using k^2 arithmetic operations
 */
 
-void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<float>> &kernel)
+void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<float>> &kernel, const char *output_filename)
 {
   int height, width, channel;
   stbi_uc *decoded_vals = stbi_load(filepath, &width, &height, &channel, STBI_rgb);
@@ -146,7 +146,7 @@ void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<
     }
   }
   
-  if(!stbi_write_png("smoothened.png", width, height, STBI_rgb, smoothened_vals, width*3)){
+  if(!stbi_write_png(output_filename, width, height, STBI_rgb, smoothened_vals, width*3)){
     fprintf(stderr, "could not write smoothened values into PNG\n");
     return;
   }
@@ -155,7 +155,7 @@ void gaussian_blur_iterable_naive(const char *filepath, std::vector<std::vector<
   free(smoothened_vals);
 }
 
-void gaussian_blur_iterable_seperable(const char *filepath, std::vector<float> &weights)
+void gaussian_blur_iterable_seperable(const char *filepath, std::vector<float> &weights, const char *output_filename)
 {
   
   int height, width, channel;
@@ -239,7 +239,7 @@ void gaussian_blur_iterable_seperable(const char *filepath, std::vector<float> &
   }
 
   
-  if(!stbi_write_png("smoothened.png", width, height, STBI_rgb, smoothened_vals, width*3)){
+  if(!stbi_write_png(output_filename, width, height, STBI_rgb, smoothened_vals, width*3)){
     fprintf(stderr, "could not write smoothened values into PNG\n");
     return;
   }
