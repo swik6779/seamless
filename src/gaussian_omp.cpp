@@ -1,5 +1,5 @@
 #include "../include/gaussian_omp.hpp"
-#include "../include/gaussian.hpp"
+#include "../include/gaussian_common.hpp"
 #include "../include/stb_image.h"
 #include "../include/stb_image_write.h"
 #include <omp.h>

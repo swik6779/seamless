@@ -1,11 +1,14 @@
 #include "include/gaussian.hpp"
 #include "include/gaussian_omp.hpp"
+#ifdef SEAMLESS_CUDA
+#include "include/gaussian_cuda.hpp"
+#endif
 #include <string.h>
 #include <omp.h>
 
 /*
   We expect the user to type something like
-  seamless --kernel_size=k --file=filename.png --exec_mode=<itna/itsep/ompna/ompsep> --output_file_name
+  seamless --kernel_size=k --file=filename.png --exec_mode=<itna/itsep/ompna/ompsep/cuna/cusep> --output_file_name
 */
 
 int main(int argc, char **argv){
@@ -47,6 +50,20 @@ int main(int argc, char **argv){
     gaussian_blur_omp_separable(filename_specification, weights, output_filename);
     end = omp_get_wtime();
   }
+#ifdef SEAMLESS_CUDA
+  else if(strcmp(exec_mode_specification, "cuna") == 0){
+    std::vector<std::vector<float>> kernel = create_gaussian_kernel(kernel_specification[strlen(kernel_specification) - 1] - '0');
+    start = omp_get_wtime();
+    gaussian_blur_cuda_naive(filename_specification, kernel, output_filename);
+    end = omp_get_wtime();
+  }
+  else if(strcmp(exec_mode_specification, "cusep") == 0){
+    std::vector<float> weights = create_gaussian_weights(kernel_specification[strlen(kernel_specification) - 1] - '0');
+    start = omp_get_wtime();
+    gaussian_blur_cuda_separable(filename_specification, weights, output_filename);
+    end = omp_get_wtime();
+  }
+#endif
 
   else{
     fprintf(stderr, "incorrect mode specified\n");
