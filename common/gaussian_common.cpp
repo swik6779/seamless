@@ -1,5 +1,6 @@
 #include "../include/gaussian_common.hpp"
 
+#include <vector>
 #include <cmath>
 #include <cstdio>
 #include <numbers>

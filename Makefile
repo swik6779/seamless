@@ -4,7 +4,8 @@ FLAGS = -fopenmp
 SRCS = main.cpp \
 			src/gaussian.cpp \
 			src/gaussian_omp.cpp \
-			common/gaussian_common.cpp
+			common/gaussian_common.cpp \
+			common/image.cpp
 
 CUDA = nvcc
 CUDA_FLAGS = -std=c++20 -Xcompiler -fopenmp -DSEAMLESS_CUDA
@@ -12,7 +13,8 @@ CUDA_SRCS = main.cpp \
 			src/gaussian.cpp \
 			src/gaussian_omp.cpp \
 			src/gaussian_cuda.cu \
-			common/gaussian_common.cpp
+			common/gaussian_common.cpp \
+			common/image.cpp
 
 seamless: $(SRCS)
 		$(CC) $(FLAGS) -o seamless $(SRCS)
