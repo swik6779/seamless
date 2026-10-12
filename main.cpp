@@ -1,5 +1,7 @@
 #include "include/gaussian.hpp"
 #include "include/gaussian_omp.hpp"
+#include "include/pyramid.hpp"
+#include "include/pyramid_io.hpp"
 #ifdef SEAMLESS_CUDA
 #include "include/gaussian_cuda.hpp"
 #endif
@@ -35,6 +37,72 @@ int integer_option(int argc, char **argv, const char *name, int default_value)
 {
   const char *value = option_value(argc, argv, name);
   return value == nullptr ? default_value : std::atoi(value);
+}
+
+int run_laplacian_blend(int argc, char **argv)
+{
+  const char *path_a = option_value(argc, argv, "--a");
+  const char *path_b = option_value(argc, argv, "--b");
+  const char *path_mask = option_value(argc, argv, "--mask");
+  const char *output = option_value(argc, argv, "--output");
+  const char *backend = option_value(argc, argv, "--backend");
+  const int kernel_size = integer_option(argc, argv, "--kernel-size", 7);
+  const int levels = integer_option(argc, argv, "--levels", 6);
+
+  if(path_a == nullptr || path_b == nullptr || path_mask == nullptr || output == nullptr || backend == nullptr ||
+     kernel_size <= 0 || kernel_size % 2 == 0 || levels <= 0){
+    fprintf(stderr, "usage: seamless laplac-blend --a FILE --b FILE --mask FILE --output FILE "
+                    "--backend cpu|omp --kernel-size ODD --levels N\n");
+    return 2;
+  }
+
+  Image loaded_a = load_image(path_a);
+  Image loaded_b = load_image(path_b);
+  Image loaded_mask = load_image(path_mask);
+  if(loaded_a.pixels == nullptr || loaded_b.pixels == nullptr || loaded_mask.pixels == nullptr){
+    free_image(&loaded_a);
+    free_image(&loaded_b);
+    free_image(&loaded_mask);
+    return 1;
+  }
+
+  try{
+    const FloatImage image_a = image_to_float(loaded_a);
+    const FloatImage image_b = image_to_float(loaded_b);
+    const FloatImage mask = mask_to_float(loaded_mask);
+    const auto weights = create_gaussian_weights(kernel_size);
+    const double start = omp_get_wtime();
+    FloatImage result;
+    if(strcmp(backend, "cpu") == 0){
+      result = blend_images_cpu(image_a, image_b, mask, weights, levels);
+    }
+    else if(strcmp(backend, "omp") == 0){
+      result = blend_images_omp(image_a, image_b, mask, weights, levels);
+    }
+    else{
+      fprintf(stderr, "unsupported blending backend: %s\n", backend);
+      free_image(&loaded_a);
+      free_image(&loaded_b);
+      free_image(&loaded_mask);
+      return 2;
+    }
+
+    const bool written = write_float_image(output, result);
+    fprintf(stdout, "%s\nElapsed time: %.6f seconds\n",
+            written ? "Blend output saved" : "Could not write blend output",
+            omp_get_wtime() - start);
+    free_image(&loaded_a);
+    free_image(&loaded_b);
+    free_image(&loaded_mask);
+    return written ? 0 : 1;
+  }
+  catch(const std::exception &error){
+    fprintf(stderr, "blend failed: %s\n", error.what());
+    free_image(&loaded_a);
+    free_image(&loaded_b);
+    free_image(&loaded_mask);
+    return 1;
+  }
 }
 
 int run_gaussian_blur(int argc, char **argv)
@@ -84,6 +152,9 @@ int main(int argc, char **argv){
 
   if(strcmp(argv[1], "gauss-blur") == 0){
     return run_gaussian_blur(argc, argv);
+  }
+  if(strcmp(argv[1], "laplac-blend") == 0){
+    return run_laplacian_blend(argc, argv);
   }
 
   // Preserve the original modes while the remaining subcommands are added.

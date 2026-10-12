@@ -35,6 +35,45 @@ int main()
     assert(std::fabs(value - 3.5f) < 1e-6f);
   }
 
+  FloatImage gradient{33, 33, 3,
+                      std::vector<float>(static_cast<std::size_t>(33) * 33 * 3)};
+  for(int y = 0; y < gradient.height; ++y){
+    for(int x = 0; x < gradient.width; ++x){
+      const std::size_t index = (static_cast<std::size_t>(y) * gradient.width + x) * gradient.channels;
+      gradient.pixels[index] = static_cast<float>(x) / gradient.width;
+      gradient.pixels[index + 1] = static_cast<float>(y) / gradient.height;
+      gradient.pixels[index + 2] = static_cast<float>(x + y) / (gradient.width + gradient.height);
+    }
+  }
+
+  const std::vector<float> blur_weights{0.25f, 0.5f, 0.25f};
+  const ImagePyramid gaussian = build_gaussian_pyramid(gradient, blur_weights, 6);
+  assert(gaussian.size() == 2);
+  assert(gaussian[0].width == 33 && gaussian[0].height == 33);
+  assert(gaussian[1].width == 17 && gaussian[1].height == 17);
+
+  const ImagePyramid laplacian = build_laplacian_pyramid(gaussian);
+  const FloatImage reconstructed = collapse_laplacian_pyramid(laplacian);
+  const float round_trip_error = max_absolute_difference(gradient, reconstructed);
+  assert(round_trip_error < 1e-6f);
+  std::cout << "round-trip max abs error: " << round_trip_error << "\n";
+
+  FloatImage other = gradient;
+  for(float &value : other.pixels){
+    value = 1.0f - value;
+  }
+  FloatImage zero_mask{33, 33, 1, std::vector<float>(static_cast<std::size_t>(33) * 33, 0.0f)};
+  FloatImage one_mask{33, 33, 1, std::vector<float>(static_cast<std::size_t>(33) * 33, 1.0f)};
+  FloatImage half_mask{33, 33, 1, std::vector<float>(static_cast<std::size_t>(33) * 33, 0.5f)};
+
+  assert(max_absolute_difference(blend_images_cpu(gradient, other, zero_mask, blur_weights, 6), other) < 1e-6f);
+  assert(max_absolute_difference(blend_images_cpu(gradient, other, one_mask, blur_weights, 6), gradient) < 1e-6f);
+  const FloatImage cpu_half = blend_images_cpu(gradient, other, half_mask, blur_weights, 6);
+  const FloatImage omp_half = blend_images_omp(gradient, other, half_mask, blur_weights, 6);
+  assert(max_absolute_difference(cpu_half, omp_half) < 1e-6f);
+  std::cout << "CPU/OpenMP blend max abs difference: "
+            << max_absolute_difference(cpu_half, omp_half) << "\n";
+
   std::cout << "pyramid primitive tests passed\n";
   return 0;
 }

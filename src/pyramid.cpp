@@ -118,3 +118,80 @@ FloatImage expand_bilinear(const FloatImage &input, int target_width, int target
 
   return output;
 }
+
+ImagePyramid build_gaussian_pyramid(const FloatImage &input,
+                                    const std::vector<float> &weights,
+                                    int max_levels,
+                                    int minimum_side)
+{
+  if(max_levels <= 0 || minimum_side <= 0){
+    throw std::invalid_argument("pyramid level count and minimum side must be positive");
+  }
+
+  ImagePyramid pyramid;
+  pyramid.push_back(input);
+
+  while(static_cast<int>(pyramid.size()) < max_levels){
+    const FloatImage &current = pyramid.back();
+    const int next_width = (current.width + 1) / 2;
+    const int next_height = (current.height + 1) / 2;
+    if(std::min(next_width, next_height) < minimum_side){
+      break;
+    }
+    pyramid.push_back(downsample(current, weights));
+  }
+
+  return pyramid;
+}
+
+ImagePyramid build_laplacian_pyramid(const ImagePyramid &gaussian)
+{
+  if(gaussian.empty()){
+    throw std::invalid_argument("Gaussian pyramid cannot be empty");
+  }
+
+  ImagePyramid laplacian(gaussian.size());
+  for(std::size_t level = 0; level + 1 < gaussian.size(); ++level){
+    const FloatImage expanded = expand_bilinear(gaussian[level + 1], gaussian[level].width, gaussian[level].height);
+    FloatImage difference = gaussian[level];
+    for(std::size_t index = 0; index < difference.pixels.size(); ++index){
+      difference.pixels[index] -= expanded.pixels[index];
+    }
+    laplacian[level] = std::move(difference);
+  }
+
+  // The coarsest Gaussian level is the residual, not a difference band.
+  laplacian.back() = gaussian.back();
+  return laplacian;
+}
+
+FloatImage collapse_laplacian_pyramid(const ImagePyramid &laplacian)
+{
+  if(laplacian.empty()){
+    throw std::invalid_argument("Laplacian pyramid cannot be empty");
+  }
+
+  FloatImage current = laplacian.back();
+  for(std::size_t level = laplacian.size() - 1; level-- > 0;){
+    FloatImage expanded = expand_bilinear(current, laplacian[level].width, laplacian[level].height);
+    for(std::size_t index = 0; index < expanded.pixels.size(); ++index){
+      expanded.pixels[index] += laplacian[level].pixels[index];
+    }
+    current = std::move(expanded);
+  }
+  return current;
+}
+
+float max_absolute_difference(const FloatImage &left, const FloatImage &right)
+{
+  if(left.width != right.width || left.height != right.height || left.channels != right.channels ||
+     left.pixels.size() != right.pixels.size()){
+    throw std::invalid_argument("images must have matching dimensions and channels");
+  }
+
+  float maximum = 0.0f;
+  for(std::size_t index = 0; index < left.pixels.size(); ++index){
+    maximum = std::max(maximum, std::fabs(left.pixels[index] - right.pixels[index]));
+  }
+  return maximum;
+}
