@@ -1,4 +1,5 @@
 #include "../include/pyramid.hpp"
+#include "../include/resize.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -29,6 +30,17 @@ int main()
   assert(expanded.channels == 1);
   assert(std::fabs(expanded.pixels.front() - 0.0f) < 1e-6f);
   assert(std::fabs(expanded.pixels.back() - 14.0f) < 1e-6f);
+
+  const FloatImage resized = resize_bilinear(input, 7, 5);
+  const FloatImage resized_omp = resize_bilinear_omp(input, 7, 5);
+  assert(resized.width == 7 && resized.height == 5 && resized.channels == 1);
+  assert(max_absolute_difference(resized, resized_omp) < 1e-6f);
+
+  const FloatImage one_row = resize_bilinear(FloatImage{1, 3, 1, {1.0f, 2.0f, 3.0f}}, 4, 1);
+  assert(one_row.width == 4 && one_row.height == 1);
+  for(float value : one_row.pixels){
+    assert(std::fabs(value - 1.0f) < 1e-6f);
+  }
 
   const FloatImage single_pixel = expand_bilinear(FloatImage{1, 1, 1, {3.5f}}, 4, 3);
   for(float value : single_pixel.pixels){

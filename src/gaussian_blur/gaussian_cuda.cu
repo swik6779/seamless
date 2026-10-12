@@ -1,4 +1,4 @@
-#include "../include/gaussian_cuda.hpp"
+#include "../../include/gaussian_cuda.hpp"
 
 constexpr int kMaxChannels = 4;
 constexpr int kBlockWidth = 16;

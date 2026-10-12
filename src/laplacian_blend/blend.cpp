@@ -1,4 +1,4 @@
-#include "../include/pyramid.hpp"
+#include "../../include/pyramid.hpp"
 
 #include <stdexcept>
 

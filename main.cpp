@@ -2,6 +2,7 @@
 #include "include/gaussian_omp.hpp"
 #include "include/pyramid.hpp"
 #include "include/pyramid_io.hpp"
+#include "include/resize.hpp"
 #ifdef SEAMLESS_CUDA
 #include "include/gaussian_cuda.hpp"
 #endif
@@ -39,6 +40,65 @@ int integer_option(int argc, char **argv, const char *name, int default_value)
   return value == nullptr ? default_value : std::atoi(value);
 }
 
+int run_resize(int argc, char **argv)
+{
+  const char *input_path = option_value(argc, argv, "--input");
+  const char *output_path = option_value(argc, argv, "--output");
+  const char *backend = option_value(argc, argv, "--backend");
+  const char *width_text = option_value(argc, argv, "--width");
+  const char *height_text = option_value(argc, argv, "--height");
+  const bool has_width = width_text != nullptr;
+  const bool has_height = height_text != nullptr;
+  const int requested_width = has_width ? std::atoi(width_text) : 0;
+  const int requested_height = has_height ? std::atoi(height_text) : 0;
+
+  if(input_path == nullptr || output_path == nullptr || backend == nullptr || has_width == has_height ||
+     (has_width && requested_width <= 0) || (has_height && requested_height <= 0)){
+    fprintf(stderr, "usage: seamless resize --input FILE --output FILE "
+                    "(--width W | --height H) --backend cpu|omp\n");
+    return 2;
+  }
+
+  Image loaded = load_image(input_path);
+  if(loaded.pixels == nullptr){
+    return 1;
+  }
+
+  try{
+    const FloatImage input = image_to_float(loaded);
+    const double aspect = static_cast<double>(input.width) / input.height;
+    const int target_width = has_width ? requested_width :
+      std::max(1, static_cast<int>(std::lround(requested_height * aspect)));
+    const int target_height = has_height ? requested_height :
+      std::max(1, static_cast<int>(std::lround(requested_width / aspect)));
+    const double start = omp_get_wtime();
+    FloatImage output;
+    if(strcmp(backend, "cpu") == 0){
+      output = resize_bilinear(input, target_width, target_height);
+    }
+    else if(strcmp(backend, "omp") == 0){
+      output = resize_bilinear_omp(input, target_width, target_height);
+    }
+    else{
+      fprintf(stderr, "unsupported resize backend: %s\n", backend);
+      free_image(&loaded);
+      return 2;
+    }
+
+    const bool written = write_float_image(output_path, output);
+    fprintf(stdout, "%s (%dx%d)\nElapsed time: %.6f seconds\n",
+            written ? "Resize output saved" : "Could not write resize output",
+            target_width, target_height, omp_get_wtime() - start);
+    free_image(&loaded);
+    return written ? 0 : 1;
+  }
+  catch(const std::exception &error){
+    fprintf(stderr, "resize failed: %s\n", error.what());
+    free_image(&loaded);
+    return 1;
+  }
+}
+
 int run_laplacian_blend(int argc, char **argv)
 {
   const char *path_a = option_value(argc, argv, "--a");
@@ -68,8 +128,18 @@ int run_laplacian_blend(int argc, char **argv)
 
   try{
     const FloatImage image_a = image_to_float(loaded_a);
-    const FloatImage image_b = image_to_float(loaded_b);
-    const FloatImage mask = mask_to_float(loaded_mask);
+    FloatImage image_b = image_to_float(loaded_b);
+    FloatImage mask = mask_to_float(loaded_mask);
+    if(image_b.width != image_a.width || image_b.height != image_a.height){
+      image_b = strcmp(backend, "omp") == 0
+        ? resize_bilinear_omp(image_b, image_a.width, image_a.height)
+        : resize_bilinear(image_b, image_a.width, image_a.height);
+    }
+    if(mask.width != image_a.width || mask.height != image_a.height){
+      mask = strcmp(backend, "omp") == 0
+        ? resize_bilinear_omp(mask, image_a.width, image_a.height)
+        : resize_bilinear(mask, image_a.width, image_a.height);
+    }
     const auto weights = create_gaussian_weights(kernel_size);
     const double start = omp_get_wtime();
     FloatImage result;
@@ -155,6 +225,9 @@ int main(int argc, char **argv){
   }
   if(strcmp(argv[1], "laplac-blend") == 0){
     return run_laplacian_blend(argc, argv);
+  }
+  if(strcmp(argv[1], "resize") == 0){
+    return run_resize(argc, argv);
   }
 
   // Preserve the original modes while the remaining subcommands are added.

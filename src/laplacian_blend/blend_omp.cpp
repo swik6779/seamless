@@ -1,4 +1,4 @@
-#include "../include/pyramid.hpp"
+#include "../../include/pyramid.hpp"
 
 #include <omp.h>
 #include <stdexcept>
