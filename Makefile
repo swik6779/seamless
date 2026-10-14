@@ -23,8 +23,10 @@ CUDA_SRCS = main.cpp \
 			src/laplacian_blend/blend_omp.cpp \
 			src/resize/resize.cpp \
 			src/resize/resize_omp.cpp \
+			src/resize/resize_cuda.cu \
 			src/pyramid_io.cpp \
 			src/gaussian_blur/gaussian_cuda.cu \
+			src/laplacian_blend/blend_cuda.cu \
 			common/gaussian_common.cpp \
 			common/image.cpp
 

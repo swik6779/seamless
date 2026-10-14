@@ -5,10 +5,14 @@
 #include "include/resize.hpp"
 #ifdef SEAMLESS_CUDA
 #include "include/gaussian_cuda.hpp"
+#include "include/laplacian_blend_cuda.hpp"
+#include "include/resize_cuda.hpp"
 #endif
 #include <string.h>
 #include <cstdlib>
 #include <iostream>
+#include <stdexcept>
+#include <utility>
 #include <omp.h>
 
 /*
@@ -79,6 +83,23 @@ int run_resize(int argc, char **argv)
     else if(strcmp(backend, "omp") == 0){
       output = resize_bilinear_omp(input, target_width, target_height);
     }
+#ifdef SEAMLESS_CUDA
+    else if(strcmp(backend, "cuda") == 0){
+      CudaTiming timing;
+      if(!resize_bilinear_cuda(input, target_width, target_height, output, &timing)){
+        free_image(&loaded);
+        return 1;
+      }
+      const bool written = write_float_image(output_path, output);
+      fprintf(stdout, "%s (%dx%d)\nCUDA host-to-device: %.3f ms\nCUDA kernels: %.3f ms\n"
+                      "CUDA device-to-host: %.3f ms\n",
+              written ? "Resize output saved" : "Could not write resize output",
+              target_width, target_height, timing.host_to_device_ms,
+              timing.kernel_ms, timing.device_to_host_ms);
+      free_image(&loaded);
+      return written ? 0 : 1;
+    }
+#endif
     else{
       fprintf(stderr, "unsupported resize backend: %s\n", backend);
       free_image(&loaded);
@@ -130,15 +151,41 @@ int run_laplacian_blend(int argc, char **argv)
     const FloatImage image_a = image_to_float(loaded_a);
     FloatImage image_b = image_to_float(loaded_b);
     FloatImage mask = mask_to_float(loaded_mask);
-    if(image_b.width != image_a.width || image_b.height != image_a.height){
-      image_b = strcmp(backend, "omp") == 0
-        ? resize_bilinear_omp(image_b, image_a.width, image_a.height)
-        : resize_bilinear(image_b, image_a.width, image_a.height);
+#ifdef SEAMLESS_CUDA
+    CudaTiming resize_timing;
+    if(strcmp(backend, "cuda") == 0){
+      if(image_b.width != image_a.width || image_b.height != image_a.height){
+        FloatImage resized;
+        if(!resize_bilinear_cuda(image_b, image_a.width, image_a.height, resized, &resize_timing)){
+          throw std::runtime_error("CUDA resize of image B failed");
+        }
+        image_b = std::move(resized);
+      }
+      if(mask.width != image_a.width || mask.height != image_a.height){
+        FloatImage resized;
+        CudaTiming mask_timing;
+        if(!resize_bilinear_cuda(mask, image_a.width, image_a.height, resized, &mask_timing)){
+          throw std::runtime_error("CUDA resize of mask failed");
+        }
+        mask = std::move(resized);
+        resize_timing.host_to_device_ms += mask_timing.host_to_device_ms;
+        resize_timing.kernel_ms += mask_timing.kernel_ms;
+        resize_timing.device_to_host_ms += mask_timing.device_to_host_ms;
+      }
     }
-    if(mask.width != image_a.width || mask.height != image_a.height){
-      mask = strcmp(backend, "omp") == 0
-        ? resize_bilinear_omp(mask, image_a.width, image_a.height)
-        : resize_bilinear(mask, image_a.width, image_a.height);
+    else
+#endif
+    {
+      if(image_b.width != image_a.width || image_b.height != image_a.height){
+        image_b = strcmp(backend, "omp") == 0
+          ? resize_bilinear_omp(image_b, image_a.width, image_a.height)
+          : resize_bilinear(image_b, image_a.width, image_a.height);
+      }
+      if(mask.width != image_a.width || mask.height != image_a.height){
+        mask = strcmp(backend, "omp") == 0
+          ? resize_bilinear_omp(mask, image_a.width, image_a.height)
+          : resize_bilinear(mask, image_a.width, image_a.height);
+      }
     }
     const auto weights = create_gaussian_weights(kernel_size);
     const double start = omp_get_wtime();
@@ -149,6 +196,27 @@ int run_laplacian_blend(int argc, char **argv)
     else if(strcmp(backend, "omp") == 0){
       result = blend_images_omp(image_a, image_b, mask, weights, levels);
     }
+#ifdef SEAMLESS_CUDA
+    else if(strcmp(backend, "cuda") == 0){
+      CudaTiming blend_timing;
+      if(!blend_images_cuda(image_a, image_b, mask, weights, levels, result, 16, &blend_timing)){
+        throw std::runtime_error("CUDA Laplacian blend failed");
+      }
+      blend_timing.host_to_device_ms += resize_timing.host_to_device_ms;
+      blend_timing.kernel_ms += resize_timing.kernel_ms;
+      blend_timing.device_to_host_ms += resize_timing.device_to_host_ms;
+      const bool written = write_float_image(output, result);
+      fprintf(stdout, "%s\nCUDA host-to-device: %.3f ms\nCUDA kernels: %.3f ms\n"
+                      "CUDA device-to-host: %.3f ms\n",
+              written ? "Blend output saved" : "Could not write blend output",
+              blend_timing.host_to_device_ms, blend_timing.kernel_ms,
+              blend_timing.device_to_host_ms);
+      free_image(&loaded_a);
+      free_image(&loaded_b);
+      free_image(&loaded_mask);
+      return written ? 0 : 1;
+    }
+#endif
     else{
       fprintf(stderr, "unsupported blending backend: %s\n", backend);
       free_image(&loaded_a);

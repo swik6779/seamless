@@ -23,6 +23,10 @@ Gaussian blur:
   --backend cpu --kernel-size 7
 ```
 
+On a CUDA-capable build, use `--backend cuda` for Gaussian blur, resize, or
+Laplacian blending. CUDA commands report host-to-device transfer, kernel, and
+device-to-host times separately.
+
 Resize while preserving aspect ratio. Specify exactly one target dimension:
 
 ```bash
@@ -35,6 +39,17 @@ Laplacian pyramid blending:
 ```bash
 ./seamless laplac-blend --a apple.png --b orange.png \
   --mask mask.png --output blended.png --backend cpu \
+  --kernel-size 7 --levels 6
+```
+
+CUDA examples:
+
+```bash
+./seamless resize --input input.png --output resized.png \
+  --height 720 --backend cuda
+
+./seamless laplac-blend --a apple.png --b orange.png \
+  --mask mask.png --output blended.png --backend cuda \
   --kernel-size 7 --levels 6
 ```
 
