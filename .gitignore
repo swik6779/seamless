@@ -7,6 +7,8 @@
 # Output binaries
 seamless
 seamless_omp
+seamless_cuda
+test_pyramid
 
 # Input images
 *.jpg
