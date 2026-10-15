@@ -68,7 +68,6 @@ Run serial CPU, OpenMP thread-count variants, and CUDA when
 ```bash
 scripts/benchmark_blend.sh \
   --a apple.png --b orange.png --mask mask.png \
-  --width 2048 --height 2048 \
   --levels 3,4,5,6 \
   --kernels 3,5,7,9,11 \
   --threads 1,2,4,8 \

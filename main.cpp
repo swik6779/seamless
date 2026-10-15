@@ -44,6 +44,23 @@ int integer_option(int argc, char **argv, const char *name, int default_value)
   return value == nullptr ? default_value : std::atoi(value);
 }
 
+int run_image_info(int argc, char **argv)
+{
+  const char *input_path = option_value(argc, argv, "--input");
+  if(input_path == nullptr){
+    fprintf(stderr, "usage: seamless image-info --input FILE\n");
+    return 2;
+  }
+
+  Image image = load_image(input_path);
+  if(image.pixels == nullptr){
+    return 1;
+  }
+  printf("width=%d\nheight=%d\nchannels=%d\n", image.width, image.height, image.channels);
+  free_image(&image);
+  return 0;
+}
+
 int run_resize(int argc, char **argv)
 {
   const char *input_path = option_value(argc, argv, "--input");
@@ -306,6 +323,9 @@ int main(int argc, char **argv){
   }
   if(strcmp(argv[1], "resize") == 0){
     return run_resize(argc, argv);
+  }
+  if(strcmp(argv[1], "image-info") == 0){
+    return run_image_info(argc, argv);
   }
 
   // Preserve the original modes while the remaining subcommands are added.

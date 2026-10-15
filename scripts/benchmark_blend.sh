@@ -6,22 +6,19 @@ usage() {
 Usage:
   scripts/benchmark_blend.sh \
     --a IMAGE_A --b IMAGE_B --mask MASK \
-    --width WIDTH --height HEIGHT \
     [--levels 3,5,6] [--kernels 3,5,7,9,11] \
     [--threads 1,2,4,8] [--repetitions N] \
     [--cpu-exe ./seamless] [--cuda-exe ./seamless_cuda] \
     [--output benchmark.csv]
 
-The input images must already be suitable for laplac-blend. WIDTH and HEIGHT
-are used only for throughput calculation and should describe image A's size.
+The input images must already be suitable for laplac-blend. Image A's
+dimensions are detected automatically and used for throughput calculation.
 EOF
 }
 
 image_a=""
 image_b=""
 mask=""
-width=""
-height=""
 levels_csv="1,2,3,4,5,6"
 kernels_csv="3,5,7,9,11"
 threads_csv="1,2,4,8"
@@ -35,8 +32,6 @@ while [[ $# -gt 0 ]]; do
     --a) image_a="$2"; shift 2 ;;
     --b) image_b="$2"; shift 2 ;;
     --mask) mask="$2"; shift 2 ;;
-    --width) width="$2"; shift 2 ;;
-    --height) height="$2"; shift 2 ;;
     --levels) levels_csv="$2"; shift 2 ;;
     --kernels) kernels_csv="$2"; shift 2 ;;
     --threads) threads_csv="$2"; shift 2 ;;
@@ -49,20 +44,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$image_a" || -z "$image_b" || -z "$mask" || -z "$width" || -z "$height" ]]; then
-  echo "--a, --b, --mask, --width, and --height are required" >&2
+if [[ -z "$image_a" || -z "$image_b" || -z "$mask" ]]; then
+  echo "--a, --b, and --mask are required" >&2
   usage >&2
   exit 2
 fi
 
-if ! [[ "$width" =~ ^[1-9][0-9]*$ && "$height" =~ ^[1-9][0-9]*$ && "$repetitions" =~ ^[1-9][0-9]*$ ]]; then
-  echo "width, height, and repetitions must be positive integers" >&2
+if ! [[ "$repetitions" =~ ^[1-9][0-9]*$ ]]; then
+  echo "repetitions must be a positive integer" >&2
   exit 2
 fi
 
 if [[ ! -x "$cpu_exe" ]]; then
   echo "CPU/OpenMP executable is not executable: $cpu_exe" >&2
   exit 2
+fi
+
+image_info="$($cpu_exe image-info --input "$image_a")"
+width="$(awk -F= '$1 == "width" { print $2 }' <<< "$image_info")"
+height="$(awk -F= '$1 == "height" { print $2 }' <<< "$image_info")"
+if ! [[ "$width" =~ ^[1-9][0-9]*$ && "$height" =~ ^[1-9][0-9]*$ ]]; then
+  echo "could not determine image A dimensions" >&2
+  exit 1
 fi
 
 if [[ ! -x "$cuda_exe" ]]; then
