@@ -83,6 +83,19 @@ int main()
   const FloatImage cpu_half = blend_images_cpu(gradient, other, half_mask, blur_weights, 6);
   const FloatImage omp_half = blend_images_omp(gradient, other, half_mask, blur_weights, 6);
   assert(max_absolute_difference(cpu_half, omp_half) < 1e-6f);
+
+  StageTiming cpu_timing;
+  StageTiming omp_timing;
+  const FloatImage timed_cpu = blend_images_cpu(gradient, other, half_mask, blur_weights, 6, 16, &cpu_timing);
+  const FloatImage timed_omp = blend_images_omp(gradient, other, half_mask, blur_weights, 6, 16, &omp_timing);
+  assert(max_absolute_difference(timed_cpu, cpu_half) < 1e-6f);
+  assert(max_absolute_difference(timed_omp, omp_half) < 1e-6f);
+  assert(cpu_timing.blur_ms >= 0.0 && cpu_timing.downsample_ms >= 0.0 &&
+         cpu_timing.expand_ms >= 0.0 && cpu_timing.subtract_ms >= 0.0 &&
+         cpu_timing.blend_ms >= 0.0 && cpu_timing.collapse_ms >= 0.0);
+  assert(omp_timing.blur_ms >= 0.0 && omp_timing.downsample_ms >= 0.0 &&
+         omp_timing.expand_ms >= 0.0 && omp_timing.subtract_ms >= 0.0 &&
+         omp_timing.blend_ms >= 0.0 && omp_timing.collapse_ms >= 0.0);
   std::cout << "CPU/OpenMP blend max abs difference: "
             << max_absolute_difference(cpu_half, omp_half) << "\n";
 

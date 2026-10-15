@@ -10,14 +10,12 @@ std::size_t FloatImage::size() const
   return static_cast<std::size_t>(width) * height * channels;
 }
 
-namespace {
-
 int clamp_coordinate(int coordinate, int limit)
 {
   return std::clamp(coordinate, 0, limit - 1);
 }
 
-FloatImage blur_float(const FloatImage &input, const std::vector<float> &weights)
+FloatImage blur_float_cpu(const FloatImage &input, const std::vector<float> &weights)
 {
   if(input.width <= 0 || input.height <= 0 || input.channels <= 0 || weights.empty() || weights.size() % 2 == 0){
     throw std::invalid_argument("invalid image or Gaussian weights");
@@ -58,21 +56,26 @@ FloatImage blur_float(const FloatImage &input, const std::vector<float> &weights
   return output;
 }
 
-}
-
 FloatImage downsample(const FloatImage &input, const std::vector<float> &weights)
 {
-  const FloatImage blurred = blur_float(input, weights);
-  const int output_width = (input.width + 1) / 2;
-  const int output_height = (input.height + 1) / 2;
-  FloatImage output{output_width, output_height, input.channels,
-                    std::vector<float>(static_cast<std::size_t>(output_width) * output_height * input.channels)};
+  return downsample_from_blurred(blur_float_cpu(input, weights));
+}
+
+FloatImage downsample_from_blurred(const FloatImage &blurred)
+{
+  if(blurred.width <= 0 || blurred.height <= 0 || blurred.channels <= 0){
+    throw std::invalid_argument("invalid blurred image");
+  }
+  const int output_width = (blurred.width + 1) / 2;
+  const int output_height = (blurred.height + 1) / 2;
+  FloatImage output{output_width, output_height, blurred.channels,
+                    std::vector<float>(static_cast<std::size_t>(output_width) * output_height * blurred.channels)};
 
   for(int y = 0; y < output.height; ++y){
     for(int x = 0; x < output.width; ++x){
-      const std::size_t source_index = (static_cast<std::size_t>(2 * y) * input.width + 2 * x) * input.channels;
+      const std::size_t source_index = (static_cast<std::size_t>(2 * y) * blurred.width + 2 * x) * blurred.channels;
       const std::size_t output_index = (static_cast<std::size_t>(y) * output.width + x) * output.channels;
-      for(int channel = 0; channel < input.channels; ++channel){
+      for(int channel = 0; channel < blurred.channels; ++channel){
         output.pixels[output_index + channel] = blurred.pixels[source_index + channel];
       }
     }

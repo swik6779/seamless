@@ -5,6 +5,7 @@ SRCS = main.cpp \
 			src/gaussian_blur/gaussian.cpp \
 			src/gaussian_blur/gaussian_omp.cpp \
 			src/pyramid/pyramid.cpp \
+			src/pyramid/pyramid_omp.cpp \
 			src/laplacian_blend/blend.cpp \
 			src/laplacian_blend/blend_omp.cpp \
 			src/resize/resize.cpp \
@@ -19,6 +20,7 @@ CUDA_SRCS = main.cpp \
 			src/gaussian_blur/gaussian.cpp \
 			src/gaussian_blur/gaussian_omp.cpp \
 			src/pyramid/pyramid.cpp \
+			src/pyramid/pyramid_omp.cpp \
 			src/laplacian_blend/blend.cpp \
 			src/laplacian_blend/blend_omp.cpp \
 			src/resize/resize.cpp \
@@ -33,8 +35,8 @@ CUDA_SRCS = main.cpp \
 seamless: $(SRCS)
 		$(CC) $(FLAGS) -o seamless $(SRCS)
 
-test_pyramid: src/pyramid/pyramid.cpp src/laplacian_blend/blend.cpp src/laplacian_blend/blend_omp.cpp src/resize/resize.cpp src/resize/resize_omp.cpp src/pyramid_io.cpp tests/test_pyramid.cpp include/pyramid.hpp include/pyramid_io.hpp include/resize.hpp
-		$(CC) $(FLAGS) -Iinclude -o test_pyramid src/pyramid/pyramid.cpp src/laplacian_blend/blend.cpp src/laplacian_blend/blend_omp.cpp src/resize/resize.cpp src/resize/resize_omp.cpp src/pyramid_io.cpp tests/test_pyramid.cpp common/image.cpp
+test_pyramid: src/pyramid/pyramid.cpp src/pyramid/pyramid_omp.cpp src/laplacian_blend/blend.cpp src/laplacian_blend/blend_omp.cpp src/resize/resize.cpp src/resize/resize_omp.cpp src/pyramid_io.cpp tests/test_pyramid.cpp include/pyramid.hpp include/pyramid_omp.hpp include/pyramid_io.hpp include/resize.hpp
+		$(CC) $(FLAGS) -Iinclude -o test_pyramid src/pyramid/pyramid.cpp src/pyramid/pyramid_omp.cpp src/laplacian_blend/blend.cpp src/laplacian_blend/blend_omp.cpp src/resize/resize.cpp src/resize/resize_omp.cpp src/pyramid_io.cpp tests/test_pyramid.cpp common/image.cpp
 
 seamless_cuda: $(CUDA_SRCS)
 		$(CUDA) $(CUDA_FLAGS) -o seamless_cuda $(CUDA_SRCS)

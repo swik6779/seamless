@@ -190,11 +190,12 @@ int run_laplacian_blend(int argc, char **argv)
     const auto weights = create_gaussian_weights(kernel_size);
     const double start = omp_get_wtime();
     FloatImage result;
+    StageTiming stage_timing;
     if(strcmp(backend, "cpu") == 0){
-      result = blend_images_cpu(image_a, image_b, mask, weights, levels);
+      result = blend_images_cpu(image_a, image_b, mask, weights, levels, 16, &stage_timing);
     }
     else if(strcmp(backend, "omp") == 0){
-      result = blend_images_omp(image_a, image_b, mask, weights, levels);
+      result = blend_images_omp(image_a, image_b, mask, weights, levels, 16, &stage_timing);
     }
 #ifdef SEAMLESS_CUDA
     else if(strcmp(backend, "cuda") == 0){
@@ -225,10 +226,19 @@ int run_laplacian_blend(int argc, char **argv)
       return 2;
     }
 
+    const double pipeline_seconds = omp_get_wtime() - start;
     const bool written = write_float_image(output, result);
-    fprintf(stdout, "%s\nElapsed time: %.6f seconds\n",
+    fprintf(stdout, "%s\nElapsed time: %.6f seconds\n"
+                    "Stage blur: %.3f ms\n"
+                    "Stage downsample: %.3f ms\n"
+                    "Stage expand: %.3f ms\n"
+                    "Stage subtract: %.3f ms\n"
+                    "Stage blend: %.3f ms\n"
+                    "Stage collapse: %.3f ms\n",
             written ? "Blend output saved" : "Could not write blend output",
-            omp_get_wtime() - start);
+            pipeline_seconds, stage_timing.blur_ms, stage_timing.downsample_ms,
+            stage_timing.expand_ms, stage_timing.subtract_ms,
+            stage_timing.blend_ms, stage_timing.collapse_ms);
     free_image(&loaded_a);
     free_image(&loaded_b);
     free_image(&loaded_mask);
