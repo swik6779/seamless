@@ -1,4 +1,4 @@
-CC = g++ -std=c++20
+CC = g++
 FLAGS = -fopenmp
 
 SRCS = main.cpp \
@@ -14,7 +14,7 @@ SRCS = main.cpp \
 			common/image.cpp
 
 CUDA = nvcc
-CUDA_FLAGS = -std=c++20 -Xcompiler -fopenmp -DSEAMLESS_CUDA
+CUDA_FLAGS = -Xcompiler -fopenmp -DSEAMLESS_CUDA
 CUDA_SRCS = main.cpp \
 			src/gaussian_blur/gaussian.cpp \
 			src/gaussian_blur/gaussian_omp.cpp \

@@ -11,7 +11,8 @@ float gaussian_function_value(float x, float sigma)
     return -1;
   }
 
-  return std::exp(-(x*x) / (2*sigma*sigma)) / (std::pow(2*std::numbers::pi, 0.5) * sigma);
+	float PI = M_PI;
+  return std::exp(-(x*x) / (2*sigma*sigma)) / (std::pow(2*PI, 0.5) * sigma);
 }
 
 std::vector<float> create_gaussian_weights(int k)
