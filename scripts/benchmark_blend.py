@@ -9,15 +9,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-HOME = Path.home()
-PROJECT = HOME / "Desktop" / "benchmarking" / "seamless"
+PROJECT = Path(__file__).resolve().parent.parent
 
-DEFAULT_A = HOME / "Desktop" / "benchmarking" / "test" / "pillars.jpg"
-DEFAULT_B = HOME / "Desktop" / "benchmarking" / "test" / "rose.jpg"
-DEFAULT_MASK = HOME / "Desktop" / "benchmarking" / "test" / "mask_grey.jpeg"
 DEFAULT_CPU = PROJECT / "seamless"
 DEFAULT_CUDA = PROJECT / "seamless_cuda"
-DEFAULT_OUTPUT = HOME / "Desktop" / "benchmarking" / "benchmark_blend.csv"
+DEFAULT_OUTPUT = PROJECT / "benchmark_blend.csv"
 
 CSV_COLUMNS = [
     "backend",
@@ -41,14 +37,6 @@ CSV_COLUMNS = [
     "speedup_vs_openmp",
 ]
 
-SOF_MARKERS = {
-    0xC0, 0xC1, 0xC2, 0xC3,
-    0xC5, 0xC6, 0xC7,
-    0xC9, 0xCA, 0xCB,
-    0xCD, 0xCE, 0xCF,
-}
-
-
 def parse_csv_ints(value):
     try:
         values = [int(item.strip()) for item in value.split(",")]
@@ -59,78 +47,6 @@ def parse_csv_ints(value):
         raise argparse.ArgumentTypeError(
             "Use comma-separated positive integers, e.g. 1,2,4"
         )
-
-
-def get_jpeg_dimensions(image_path):
-    """Read JPEG width and height without external packages."""
-    try:
-        with open(image_path, "rb") as image:
-            if image.read(2) != b"\xff\xd8":
-                raise RuntimeError(
-                    f"Input is not a JPEG file: {image_path}"
-                )
-
-            while True:
-                byte = image.read(1)
-
-                if not byte:
-                    break
-
-                if byte != b"\xff":
-                    continue
-
-                marker_byte = image.read(1)
-
-                while marker_byte == b"\xff":
-                    marker_byte = image.read(1)
-
-                if not marker_byte:
-                    break
-
-                marker = marker_byte[0]
-
-                # Standalone markers do not have segment lengths.
-                if (
-                    marker == 0x01
-                    or marker in (0xD8, 0xD9)
-                    or 0xD0 <= marker <= 0xD7
-                ):
-                    continue
-
-                length_data = image.read(2)
-
-                if len(length_data) != 2:
-                    break
-
-                segment_length = int.from_bytes(length_data, "big")
-
-                if segment_length < 2:
-                    break
-
-                if marker in SOF_MARKERS:
-                    data = image.read(5)
-
-                    if len(data) != 5:
-                        break
-
-                    height = int.from_bytes(data[1:3], "big")
-                    width = int.from_bytes(data[3:5], "big")
-
-                    if width > 0 and height > 0:
-                        return width, height
-
-                    break
-
-                image.seek(segment_length - 2, os.SEEK_CUR)
-
-    except OSError as exc:
-        raise RuntimeError(
-            f"Unable to read image {image_path}: {exc}"
-        ) from exc
-
-    raise RuntimeError(
-        f"Could not determine JPEG dimensions: {image_path}"
-    )
 
 
 def extract_value(label, output, required=True):
@@ -220,9 +136,9 @@ def main():
         )
     )
 
-    parser.add_argument("--a", default=str(DEFAULT_A), help="Image A")
-    parser.add_argument("--b", default=str(DEFAULT_B), help="Image B")
-    parser.add_argument("--mask", default=str(DEFAULT_MASK), help="Mask")
+    parser.add_argument("--a", required=True, help="Image A")
+    parser.add_argument("--b", required=True, help="Image B")
+    parser.add_argument("--mask", required=True, help="Mask")
     parser.add_argument(
         "--levels",
         type=parse_csv_ints,
@@ -241,9 +157,7 @@ def main():
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--cpu-exe", default=str(DEFAULT_CPU))
     parser.add_argument("--cuda-exe", default=str(DEFAULT_CUDA))
-    parser.add_argument("--output", default=str(DEFAULT_OUTPUT)
-
-    )
+    parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     args = parser.parse_args()
 
     if args.repetitions < 1:
@@ -271,7 +185,25 @@ def main():
             f"CPU/OpenMP executable is not executable: {cpu_exe}"
         )
 
-    width, height = get_jpeg_dimensions(args.a)
+    image_info = run_command(
+        [str(cpu_exe), "image-info", "--input", args.a]
+    )
+    dimensions = {}
+    for line in image_info.splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            dimensions[key.strip()] = value.strip()
+
+    try:
+        width = int(dimensions["width"])
+        height = int(dimensions["height"])
+    except (KeyError, ValueError) as exc:
+        raise RuntimeError(
+            "image-info did not return valid width and height"
+        ) from exc
+
+    if width <= 0 or height <= 0:
+        raise RuntimeError("image-info returned non-positive dimensions")
 
     print(f"Image dimensions: {width} x {height}")
 

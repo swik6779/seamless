@@ -66,7 +66,7 @@ Run serial CPU, OpenMP thread-count variants, and CUDA when
 `./seamless_cuda` exists:
 
 ```bash
-scripts/benchmark_blend.sh \
+python3 scripts/benchmark_blend.py \
   --a apple.png --b orange.png --mask mask.png \
   --levels 3,4,5,6 \
   --kernels 3,5,7,9,11 \
